@@ -1,0 +1,41 @@
+# Frontend dependencies and build output
+**/node_modules/
+**/dist/
+**/unpackage/
+**/.vite/
+**/.cache/
+**/coverage/
+
+# Java build output
+**/target/
+*.class
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/application-local.yml
+**/application-local.yaml
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime files and persistent service data
+**/logs/
+*.log
+/runtime/
+/data/
+/backend/upload/
+/backend/uploads/
+/deploy/data/
+/deploy/certs/
+
+# Personal IDE and operating system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+Desktop.ini
