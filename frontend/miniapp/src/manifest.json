@@ -1,0 +1,16 @@
+{
+  "name": "乡间好物",
+  "appid": "",
+  "description": "乡村特色农产品展示与助农推广平台",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "vueVersion": "3",
+  "h5": { "title": "乡间好物 · 助农平台", "router": { "mode": "hash" } },
+  "mp-weixin": {
+    "appid": "",
+    "setting": { "urlCheck": true },
+    "usingComponents": true
+  },
+  "uniStatistics": { "enable": false }
+}

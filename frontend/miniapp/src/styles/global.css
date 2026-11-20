@@ -1,0 +1,21 @@
+page { background: #f7f8f2; color: #233e30; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 28rpx; }
+view, text, button, input { box-sizing: border-box; }
+button { font-family: inherit; }
+button::after { border: none; }
+.page { max-width: 1040rpx; margin: 0 auto; padding: 32rpx 32rpx 64rpx; }
+.eyebrow { display: block; color: #6c806d; font-size: 23rpx; letter-spacing: 4rpx; margin-bottom: 12rpx; }
+.page-title { display: block; font-size: 46rpx; font-weight: 700; line-height: 1.4; }
+.page-description { display: block; margin-top: 12rpx; color: #788078; font-size: 26rpx; line-height: 1.8; white-space: pre-line; }
+.section { margin-top: 36rpx; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 20rpx; }
+.section-title { font-size: 32rpx; font-weight: 700; }
+.text-button { background: transparent; color: #42674c; font-size: 24rpx; padding: 0; margin: 0; line-height: 2; }
+.card { border: 1rpx solid #e3e9df; border-radius: 24rpx; background: #fff; padding: 28rpx; }
+.preview-note { margin-top: 28rpx; color: #8a8f85; font-size: 22rpx; text-align: center; line-height: 1.7; }
+.primary-button { margin: 28rpx 0 0; border-radius: 16rpx; background: #205b45; color: white; padding: 0 28rpx; font-size: 28rpx; line-height: 88rpx; }
+.secondary-button { margin: 24rpx 0 0; border: 1rpx solid #dce6db; border-radius: 16rpx; background: #f4f7f0; color: #315b41; font-size: 26rpx; line-height: 80rpx; }
+.muted { color: #788078; }
+.menu-item { padding: 28rpx 0; border-bottom: 1rpx solid #edf0e9; display: flex; align-items: center; justify-content: space-between; }
+.menu-item:last-child { border-bottom: none; }
+.menu-note { font-size: 23rpx; color: #8b958c; }
+.auth-page { max-width: 900rpx; }.auth-field { margin-bottom: 28rpx; }.auth-label { display: block; font-size: 26rpx; font-weight: 600; margin-bottom: 14rpx; }.auth-input { background: #f5f7f1; border: 1rpx solid #e0e7db; border-radius: 12rpx; height: 86rpx; padding: 0 22rpx; font-size: 28rpx; width: 100%; }.auth-input[disabled] { opacity: .65; }.password-row { display: flex; align-items: center; gap: 12rpx; }.password-row .auth-input { flex: 1; min-width: 0; }.password-toggle { margin: 0; padding: 0 10rpx; line-height: 72rpx; font-size: 24rpx; color: #42674c; background: transparent; flex-shrink: 0; }.auth-field-error { display: block; color: #a04535; font-size: 23rpx; line-height: 1.6; margin-top: 10rpx; }.auth-message { display: block; background: #fff1e9; color: #904d35; border-radius: 12rpx; padding: 20rpx; font-size: 24rpx; line-height: 1.7; margin-top: 20rpx; word-break: break-word; }.auth-success { margin-top: 24rpx; padding: 20rpx; background: #e6efdf; border-radius: 12rpx; color: #315b41; font-size: 24rpx; line-height: 1.7; }.auth-switch { background: transparent; color: #315b41; font-size: 26rpx; line-height: 2; margin-top: 28rpx; }.auth-footnote { display: block; color: #8a8f85; font-size: 23rpx; line-height: 1.8; text-align: center; margin-top: 22rpx; }.primary-button[disabled], .secondary-button[disabled] { opacity: .65; }

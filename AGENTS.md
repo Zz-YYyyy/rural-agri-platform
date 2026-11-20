@@ -52,8 +52,14 @@
 - 迁移脚本放在 `backend/src/main/resources/db/migration/`；数据库迁移方案明确后按所选工具命名和执行。
 - 演示数据脚本放在 `backend/src/main/resources/db/seed/`，与正式结构迁移区分，未经明确指定不自动导入。
 - 不用 Redis 缓存值作为订单金额、库存扣减或订单状态的最终依据。
-- 截至 2026-11-20，已有需求材料、29 表的 V1 字段字典与初始迁移 SQL，以及正常主流程的接口契约、四份中文模块说明和生成的字段说明。尚无应用工程、实际迁移验证或 HTTP 联调；下一步初始化基础工程并核对固定兼容版本，隔离 MySQL 8.0 迁移验证仍待执行。静态检查不能代替运行结果。
+- 截至 2026-11-20，需求、29 表 V1 与正常主流程接口设计已形成；三端基础工程已初始化，专用 MySQL 8.0.46／Redis 8.10.3 已接通并完成 V1 迁移。dev 已实现注册、登录、/me、退出四项接口及两前端账号流程；bootstrap 继续无 DB／Redis 外连，不开放业务。无默认管理员，其余业务和微信开发者工具运行仍待完成，记录见 docs/testing/账号与基础设施验证记录.md。
 - 接口内的 `x-pending-policy` 与待确认问题标记需继续保留并遵守；正常主流程已有契约不表示所有核心权限分支已经闭合。不能从表字段、统一管理员身份或普通 CRUD 推定尚未确认的业务权限。
+
+## 基础工程运行
+
+- 运行与配置统一见 `docs/development/本地开发与运行.md`。PowerShell 7 可用 `scripts/dev.ps1 -Target backend|admin|h5|weixin` 启动单端；专用服务由 `scripts/local-services.ps1 -Action start|stop|status` 管理，真实账号后端加 `-UseLocalServices` 加载被忽略的 runtime/local-env.json；`scripts/check.ps1` 检查文档、后端与两端构建。
+- 两个前端分别维护精确依赖和 package-lock，后续使用 npm ci。uni-app 编译器依赖必须成套验证升级，不使用 npm audit fix --force 强行突破 peer 约束；已知审计问题与公网使用限制见验证记录。
+- 业务源码目录和包名使用英文，文档继续用中文名称；不要硬编码当前工作区绝对路径。构建输出、node_modules、target 与本地配置不提交。
 
 ## 验证
 

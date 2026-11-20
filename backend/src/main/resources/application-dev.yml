@@ -1,0 +1,45 @@
+# Explicit opt-in infrastructure profile. Supply environment variables locally.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 5000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: 3s
+      timeout: 3s
+      repositories:
+        enabled: false
+  flyway:
+    enabled: ${DB_MIGRATE_ENABLED:false}
+
+springdoc:
+  api-docs:
+    enabled: true
+    version: OPENAPI_3_0
+  swagger-ui:
+    enabled: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+app:
+  auth:
+    jwt-secret-base64: ${JWT_SECRET_BASE64:}
+    issuer: ${JWT_ISSUER:rural-agri-platform}
+    audience: ${JWT_AUDIENCE:rural-agri-clients}
+    public-base-url: ${PUBLIC_BASE_URL:http://127.0.0.1:8080}
+    register-per-minute: ${AUTH_REGISTER_PER_MINUTE:5}
+    login-ip-per-minute: ${AUTH_LOGIN_IP_PER_MINUTE:30}
+    login-account-per-minute: ${AUTH_LOGIN_ACCOUNT_PER_MINUTE:10}
