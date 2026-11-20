@@ -1,0 +1,3152 @@
+{
+  "paths": {
+    "/api/v1/me/consultations": {
+      "post": {
+        "operationId": "startConsultation",
+        "summary": "发起咨询并发送首条消息",
+        "description": "仅登录用户。锁定双方唯一会话，不存在则创建，同时写首条消息；FARMER主页来源可不选商品，其余按来源校验。初次不允许DIRECT，禁止自己咨询自己。Idempotency-Key映射消息client_message_id（同会话同发送者唯一），既有成功重试返回原消息；新来源失效不抹去既有成功。消息和推广CONSULT事件同事务提交，不创建订单或占用库存。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-COMM-001",
+          "FR-COMM-002"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001",
+          "AC-COMM-003"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message",
+          "promotion_event"
+        ],
+        "x-errors": [
+          {
+            "code": "SOURCE_UNAVAILABLE",
+            "status": 409,
+            "message": "原商品或推广来源不可用于发起咨询"
+          },
+          {
+            "code": "SELF_CONSULTATION",
+            "status": 400,
+            "message": "不能向自己的农户身份发起咨询"
+          },
+          {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "status": 409,
+            "message": "同一发送键对应不同内容或来源"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ConsultationSendResult"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "业务状态、库存、报价或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConsultation"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "buyerConsultations",
+        "summary": "查询我的咨询会话",
+        "description": "只返回当前账号在本侧的会话；农户账号的买家会话与经营会话分别查询。按last_message_at降序、id降序。未读只统计对方发送且seq大于本侧读取位置的消息。管理员不因其身份获得此接口的他人聊天权限。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-COMM-001"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ConsultationThread"
+                          },
+                          "description": "本页记录",
+                          "minItems": 0
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "符合筛选条件的总条数",
+                          "minimum": 0
+                        },
+                        "page": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "当前页",
+                          "minimum": 1
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "每页条数",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total",
+                        "page",
+                        "pageSize"
+                      ]
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "页码，从1开始",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "description": "页码，从1开始"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "每页条数",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "每页条数"
+          }
+        ]
+      }
+    },
+    "/api/v1/me/consultations/{threadId}/messages": {
+      "get": {
+        "operationId": "buyerConsultationMessages",
+        "summary": "读取会话消息",
+        "description": "校验当前侧归属。beforeSeq与afterSeq最多传一个；不传取最近limit条并按seq升序返回，向前翻页用beforeSeq，页面可见时获取新消息用afterSeq。limit默认20最大100；读取本身不改变已读位置。游标指本会话消息序号，不按全局ID或时间分页。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-COMM-001"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MessageSlice"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "name": "beforeSeq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "beforeSeq"
+          },
+          {
+            "name": "afterSeq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "afterSeq"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "读取条数",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "读取条数"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "buyerSendConsultationMessage",
+        "summary": "发送会话文字消息",
+        "description": "校验双方会话归属；本侧身份由路由和登录账号确定，客户端不能指定senderUserId。农户回复只能DIRECT，买家可以DIRECT或经过校验的新来源。锁会话分配seq、写消息及来源统计；同Idempotency-Key映射client_message_id，重试不多发、不多计咨询。新消息成功后未读位置不自动推进到对方后来消息。禁用后的存量通信权限仍须按待确认规则配置，不能默认放开。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-COMM-001",
+          "FR-COMM-002"
+        ],
+        "x-acceptance": [
+          "AC-COMM-003"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message",
+          "promotion_event"
+        ],
+        "x-errors": [
+          {
+            "code": "SOURCE_UNAVAILABLE",
+            "status": 409,
+            "message": "原商品或推广来源不可用于发起咨询"
+          },
+          {
+            "code": "SELF_CONSULTATION",
+            "status": 400,
+            "message": "不能向自己的农户身份发起咨询"
+          },
+          {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "status": 409,
+            "message": "同一发送键对应不同内容或来源"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ConsultationMessage"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "业务状态、库存、报价或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "x-pending-policy": [
+          "Q-FARM-001：经营禁用后的存量通信操作，未定前拒绝受限身份的新发送"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendConsultation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/consultations/{threadId}/read-position": {
+      "put": {
+        "operationId": "buyerMarkConsultationRead",
+        "summary": "更新会话已读位置",
+        "description": "本人侧read_seq只向前推进；重复或更小值保持原位置，超过last_seq拒绝。消息读取与确认已读分开；更新不能替另一侧标为已读。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-COMM-001"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001"
+        ],
+        "x-tables": [
+          "consultation_thread"
+        ],
+        "x-errors": [
+          {
+            "code": "READ_POSITION_INVALID",
+            "status": 400,
+            "message": "已读位置超出本会话已提交消息"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EmptyData"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRead"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/farmer/consultations": {
+      "get": {
+        "operationId": "farmerConsultations",
+        "summary": "查询我的咨询会话",
+        "description": "只返回当前账号在本侧的会话；农户账号的买家会话与经营会话分别查询。按last_message_at降序、id降序。未读只统计对方发送且seq大于本侧读取位置的消息。管理员不因其身份获得此接口的他人聊天权限。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "FARMER",
+        "x-requirements": [
+          "FR-COMM-001"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ConsultationThread"
+                          },
+                          "description": "本页记录",
+                          "minItems": 0
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "符合筛选条件的总条数",
+                          "minimum": 0
+                        },
+                        "page": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "当前页",
+                          "minimum": 1
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "每页条数",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total",
+                        "page",
+                        "pageSize"
+                      ]
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "页码，从1开始",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "description": "页码，从1开始"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "每页条数",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "每页条数"
+          }
+        ]
+      }
+    },
+    "/api/v1/farmer/consultations/{threadId}/messages": {
+      "get": {
+        "operationId": "farmerConsultationMessages",
+        "summary": "读取会话消息",
+        "description": "校验当前侧归属。beforeSeq与afterSeq最多传一个；不传取最近limit条并按seq升序返回，向前翻页用beforeSeq，页面可见时获取新消息用afterSeq。limit默认20最大100；读取本身不改变已读位置。游标指本会话消息序号，不按全局ID或时间分页。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "FARMER",
+        "x-requirements": [
+          "FR-COMM-001"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MessageSlice"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "name": "beforeSeq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "beforeSeq"
+          },
+          {
+            "name": "afterSeq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "afterSeq"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "读取条数",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "读取条数"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "farmerSendConsultationMessage",
+        "summary": "发送会话文字消息",
+        "description": "校验双方会话归属；本侧身份由路由和登录账号确定，客户端不能指定senderUserId。农户回复只能DIRECT，买家可以DIRECT或经过校验的新来源。锁会话分配seq、写消息及来源统计；同Idempotency-Key映射client_message_id，重试不多发、不多计咨询。新消息成功后未读位置不自动推进到对方后来消息。禁用后的存量通信权限仍须按待确认规则配置，不能默认放开。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "FARMER",
+        "x-requirements": [
+          "FR-COMM-001",
+          "FR-COMM-002"
+        ],
+        "x-acceptance": [
+          "AC-COMM-003"
+        ],
+        "x-tables": [
+          "consultation_thread",
+          "consultation_message",
+          "promotion_event"
+        ],
+        "x-errors": [
+          {
+            "code": "SOURCE_UNAVAILABLE",
+            "status": 409,
+            "message": "原商品或推广来源不可用于发起咨询"
+          },
+          {
+            "code": "SELF_CONSULTATION",
+            "status": 400,
+            "message": "不能向自己的农户身份发起咨询"
+          },
+          {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "status": 409,
+            "message": "同一发送键对应不同内容或来源"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ConsultationMessage"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "业务状态、库存、报价或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "x-pending-policy": [
+          "Q-FARM-001：经营禁用后的存量通信操作，未定前拒绝受限身份的新发送"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendConsultation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/farmer/consultations/{threadId}/read-position": {
+      "put": {
+        "operationId": "farmerMarkConsultationRead",
+        "summary": "更新会话已读位置",
+        "description": "本人侧read_seq只向前推进；重复或更小值保持原位置，超过last_seq拒绝。消息读取与确认已读分开；更新不能替另一侧标为已读。",
+        "tags": [
+          "站内咨询"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "FARMER",
+        "x-requirements": [
+          "FR-COMM-001"
+        ],
+        "x-acceptance": [
+          "AC-COMM-001"
+        ],
+        "x-tables": [
+          "consultation_thread"
+        ],
+        "x-errors": [
+          {
+            "code": "READ_POSITION_INVALID",
+            "status": 400,
+            "message": "已读位置超出本会话已提交消息"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EmptyData"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRead"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/capabilities": {
+      "get": {
+        "operationId": "getAiCapabilities",
+        "summary": "查看AI入口与可用性",
+        "description": "只返回静态入口能力和公开可用性，不调用任何收费模型，不暴露预算余额、供应商Key或内部系统提示词。个人每日次数不作为限制字段。",
+        "tags": [
+          "AI导购"
+        ],
+        "security": [],
+        "x-permission": "PUBLIC",
+        "x-requirements": [
+          "FR-AI-006",
+          "FR-AI-007"
+        ],
+        "x-acceptance": [
+          "AC-AI-005",
+          "AC-AI-007"
+        ],
+        "x-tables": [],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiCapabilities"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/ai/conversations": {
+      "post": {
+        "operationId": "createAiConversation",
+        "summary": "建立AI导购会话",
+        "description": "创建空会话，不调用收费模型；由当前账号拥有。标题选填，默认在首次合法用户消息后取前30字符生成，不调用模型生成标题。创建失败先查列表，不能声称会话创建具有跨崩溃幂等保障。",
+        "tags": [
+          "AI导购"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-AI-002",
+          "FR-AI-007"
+        ],
+        "x-acceptance": [
+          "AC-AI-008"
+        ],
+        "x-tables": [
+          "ai_conversation"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiConversation"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "选填标题",
+                    "maxLength": 120
+                  }
+                },
+                "example": {}
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAiConversations",
+        "summary": "查询本人AI会话",
+        "description": "仅本人会话，按lastActivityAt和id降序。可查询仍保留的数据；不承诺永久历史，保留/删除策略仍待AI模块落实。",
+        "tags": [
+          "AI导购"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-AI-002"
+        ],
+        "x-acceptance": [
+          "AC-AI-008"
+        ],
+        "x-tables": [
+          "ai_conversation"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AiConversation"
+                          },
+                          "description": "本页记录",
+                          "minItems": 0
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "符合筛选条件的总条数",
+                          "minimum": 0
+                        },
+                        "page": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "当前页",
+                          "minimum": 1
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "每页条数",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total",
+                        "page",
+                        "pageSize"
+                      ]
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "页码，从1开始",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "description": "页码，从1开始"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "每页条数",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "每页条数"
+          }
+        ]
+      }
+    },
+    "/api/v1/me/ai/conversations/{conversationId}/messages": {
+      "get": {
+        "operationId": "listAiMessages",
+        "summary": "读取AI会话历史消息",
+        "description": "校验会话所有者；不传beforeSeq取最近limit条，返回按seq升序。历史卡片必须重新核验商品，失效/缺货/下架商品不再作为可购买推荐返回；原文字保留但不能据其现价下单。只读查询不调用模型。",
+        "tags": [
+          "AI导购"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-AI-002",
+          "FR-AI-003"
+        ],
+        "x-acceptance": [
+          "AC-AI-003",
+          "AC-AI-008"
+        ],
+        "x-tables": [
+          "ai_conversation",
+          "ai_message",
+          "product",
+          "product_sku"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiMessageSlice"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "name": "beforeSeq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "beforeSeq"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "条数",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "条数"
+          }
+        ]
+      }
+    },
+    "/api/v1/me/ai/conversations/{conversationId}/requests": {
+      "post": {
+        "operationId": "submitAiRequest",
+        "summary": "提交一次导购提问",
+        "description": "先验证登录、归属、会话ACTIVE、输入长度和业务参数白名单，再查同Idempotency-Key已有消息；同键同内容返回原进度，异内容409。同会话同时最多一个PENDING回复；处理中新的提问409，不重复发起收费调用。接受后持久化USER COMPLETED和ASSISTANT PENDING，释放数据库事务后由受控后台执行导购，返回202供轮询。必要费用预留在每次上游调用前完成。接受前发现缺少供应商/预算配置或额度不足返回503，短时限流429；已返回202后发生预算争抢、执行失败或上游异常时，将原ASSISTANT消息写为FAILED并带errorCode，GET原请求返回200及该终态，不尝试改写已经返回的HTTP状态，也不无限保留PENDING。请求体仅content，不允许model/baseUrl/tools/systemPrompt/temperature等通用模型代理参数。确定的本地无关任务拒绝可生成REJECTED固定提示，不收费；需要收费的判断也受调用预算限制。",
+        "tags": [
+          "AI导购"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-AI-001",
+          "FR-AI-002",
+          "FR-AI-003",
+          "FR-AI-004",
+          "FR-AI-005",
+          "FR-AI-006",
+          "FR-AI-007"
+        ],
+        "x-acceptance": [
+          "AC-AI-001",
+          "AC-AI-002",
+          "AC-AI-005",
+          "AC-AI-007",
+          "AC-AI-008"
+        ],
+        "x-tables": [
+          "ai_conversation",
+          "ai_message",
+          "ai_usage_log"
+        ],
+        "x-errors": [
+          {
+            "code": "AI_NOT_CONFIGURED",
+            "status": 503,
+            "message": "模型或费用配置尚未就绪"
+          },
+          {
+            "code": "AI_BUDGET_EXHAUSTED",
+            "status": 503,
+            "message": "平台AI预算暂不足，请使用搜索选购"
+          },
+          {
+            "code": "AI_UNAVAILABLE",
+            "status": 503,
+            "message": "AI依赖暂不可用"
+          },
+          {
+            "code": "AI_BUSY",
+            "status": 409,
+            "message": "本会话仍有回答生成中"
+          },
+          {
+            "code": "RATE_LIMITED",
+            "status": 429,
+            "message": "请求过于频繁"
+          },
+          {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "status": 409,
+            "message": "同一请求键对应不同问题"
+          },
+          {
+            "code": "AI_CONVERSATION_CLOSED",
+            "status": 409,
+            "message": "该会话不可继续"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiRequestResult"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "业务状态、库存、报价或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求过于频繁",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "服务端建议再次尝试前等待的秒数，不以自动重试绕过限流。",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "example": 10
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖不可用或待定策略暂未启用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "导购问题，不能为空白，最多1000字符",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "content"
+                ],
+                "example": {
+                  "content": "预算100元，有什么应季水果推荐？"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/ai/conversations/{conversationId}/requests/{requestId}": {
+      "get": {
+        "operationId": "getAiRequest",
+        "summary": "查询一次导购请求进度",
+        "description": "校验会话与请求归属；返回原两条消息最新状态。PENDING时按pollAfterMs轮询，终态停止；页面后台暂停轮询，回到前台继续读取。失败不自动另起模型请求；用户明确重试才产生新请求键，仍受频率/预算限制。业务模型超时标为FAILED或对应固定提示，用量未知保留待核对占用。接口不返回隐藏推理、工具原始结果或上游密钥。",
+        "tags": [
+          "AI导购"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-AI-002",
+          "FR-AI-004"
+        ],
+        "x-acceptance": [
+          "AC-AI-002",
+          "AC-AI-008"
+        ],
+        "x-tables": [
+          "ai_conversation",
+          "ai_message"
+        ],
+        "x-errors": [],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiRequestResult"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "目标资源ID，服务端校验归属与可访问性"
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "发送幂等键",
+              "minLength": 16,
+              "maxLength": 64
+            },
+            "description": "原Idempotency-Key，非内部模型call_id"
+          }
+        ]
+      }
+    },
+    "/api/v1/uploads/images": {
+      "post": {
+        "operationId": "uploadImage",
+        "summary": "上传业务图片",
+        "description": "multipart/form-data，file与purpose必填；单文件不超过5MiB，后端按实际内容校验JPEG/PNG/WebP并剥离元数据。禁止SVG/HTML/可执行内容；生成含账号归属的随机key，规范路径禁止..及目录穿越，返回key供表单保存。purpose=PRODUCT/FARMER_COVER/STORY须经营身份有效，ORIGIN/CAMPAIGN须管理员，REVIEW/AVATAR须本人账号。写业务资料时再次验证key所属账号及允许用途；访问URL可公开，上传元数据/私密业务归属不直接公开。客户端不能指定存储路径或外部URL；该接口不修改业务资料，不会自动创建商品。未引用资源清理策略在存储实现中确定。",
+        "tags": [
+          "公共上传"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-permission": "MEMBER",
+        "x-requirements": [
+          "FR-PRODUCT-003",
+          "FR-FARM-003",
+          "FR-REVIEW-002",
+          "FR-CONTENT-001"
+        ],
+        "x-acceptance": [
+          "AC-FARM-003",
+          "AC-REVIEW-009",
+          "AC-REVIEW-012"
+        ],
+        "x-tables": [],
+        "x-errors": [
+          {
+            "code": "UPLOAD_TOO_LARGE",
+            "status": 413,
+            "message": "图片超过5MiB"
+          },
+          {
+            "code": "UPLOAD_TYPE_UNSUPPORTED",
+            "status": 415,
+            "message": "只支持JPEG、PNG或WebP图片"
+          },
+          {
+            "code": "UPLOAD_PURPOSE_FORBIDDEN",
+            "status": 403,
+            "message": "当前账号不能为该用途上传"
+          },
+          {
+            "code": "UPLOAD_UNAVAILABLE",
+            "status": 503,
+            "message": "文件存储暂不可用"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data结构如下",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "成功代码",
+                      "enum": [
+                        "OK"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示文字",
+                      "example": "成功"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UploadResult"
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "服务端排查标识",
+                      "maxLength": 64,
+                      "example": "demo-trace-001"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或格式校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或账号受限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "文件过大",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件类型不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖不可用或待定策略暂未启用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "单张图片，后端按字节限制5MiB"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "业务用途",
+                    "enum": [
+                      "AVATAR",
+                      "PRODUCT",
+                      "FARMER_COVER",
+                      "STORY",
+                      "ORIGIN",
+                      "CAMPAIGN",
+                      "REVIEW"
+                    ]
+                  }
+                },
+                "required": [
+                  "file",
+                  "purpose"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ConsultationSource": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "首次咨询来源；DIRECT只用于已有会话的后续发送",
+            "enum": [
+              "DIRECT",
+              "FARMER",
+              "PRODUCT",
+              "CAMPAIGN",
+              "ASSISTANCE"
+            ]
+          },
+          "productId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "campaignId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "assistancePostId": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "description": "FARMER/DIRECT不带来源ID；PRODUCT仅productId；CAMPAIGN带productId与campaignId；ASSISTANCE带productId与assistancePostId。服务端检查来源公开状态与农户归属。",
+        "example": {
+          "type": "PRODUCT",
+          "productId": "101"
+        }
+      },
+      "ConsultationMessage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "seq": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "senderSide": {
+            "type": "string",
+            "description": "真实发送侧",
+            "enum": [
+              "USER",
+              "FARMER"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "description": "普通文字",
+            "maxLength": 2000
+          },
+          "source": {
+            "$ref": "#/components/schemas/ConsultationSource"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/UtcDateTime"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "senderSide",
+          "content",
+          "source",
+          "createdAt"
+        ]
+      },
+      "ConsultationThread": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "farmerId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "counterpartyName": {
+            "type": "string",
+            "description": "对方显示名称",
+            "maxLength": 80
+          },
+          "mySide": {
+            "type": "string",
+            "description": "当前列表对应的会话身份",
+            "enum": [
+              "USER",
+              "FARMER"
+            ]
+          },
+          "unreadCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "对方消息未读条数",
+            "minimum": 0
+          },
+          "lastSeq": {
+            "type": "string",
+            "description": "最大消息序号，空会话为0",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "maxLength": 19
+          },
+          "lastMessageAt": {
+            "$ref": "#/components/schemas/UtcDateTime"
+          },
+          "lastMessagePreview": {
+            "type": "string",
+            "description": "最近消息预览",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "farmerId",
+          "counterpartyName",
+          "mySide",
+          "unreadCount",
+          "lastSeq"
+        ]
+      },
+      "StartConsultation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "farmerId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "content": {
+            "type": "string",
+            "description": "首条普通文字，不能为空白",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "source": {
+            "$ref": "#/components/schemas/ConsultationSource"
+          }
+        },
+        "required": [
+          "farmerId",
+          "content",
+          "source"
+        ],
+        "example": {
+          "farmerId": "8",
+          "content": "这批柑橘下周还有货吗？",
+          "source": {
+            "type": "PRODUCT",
+            "productId": "101"
+          }
+        }
+      },
+      "SendConsultation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "普通文字，不能为空白",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "source": {
+            "$ref": "#/components/schemas/ConsultationSource"
+          }
+        },
+        "required": [
+          "content",
+          "source"
+        ],
+        "example": {
+          "content": "想问一下小包装。",
+          "source": {
+            "type": "DIRECT"
+          }
+        }
+      },
+      "ConsultationSendResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/ConsultationThread"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ConsultationMessage"
+          }
+        },
+        "required": [
+          "thread",
+          "message"
+        ]
+      },
+      "MessageSlice": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsultationMessage"
+            },
+            "description": "按seq升序的消息",
+            "minItems": 0
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "所选方向还有消息",
+            "example": false
+          },
+          "nextSeq": {
+            "type": "string",
+            "description": "下一次游标，空结果可省略",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "maxLength": 19
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      },
+      "MarkRead": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "readSeq": {
+            "type": "string",
+            "description": "已展示至的序号，允许0；不能超过已提交lastSeq",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "maxLength": 19
+          }
+        },
+        "required": [
+          "readSeq"
+        ],
+        "example": {
+          "readSeq": "12"
+        }
+      },
+      "AiCapabilities": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "当前配置与预算状态是否允许新调用",
+            "example": false
+          },
+          "loginRequired": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "发送消息必须登录"
+          },
+          "maxInputChars": {
+            "type": "integer",
+            "format": "int32",
+            "description": "本轮输入表单字符上限",
+            "minimum": 1,
+            "maximum": 1000,
+            "example": 1000
+          },
+          "reasonCode": {
+            "type": "string",
+            "description": "不可用时的公开原因",
+            "enum": [
+              "AI_NOT_CONFIGURED",
+              "AI_BUDGET_EXHAUSTED",
+              "AI_UNAVAILABLE"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "loginRequired",
+          "maxInputChars"
+        ],
+        "example": {
+          "enabled": false,
+          "loginRequired": true,
+          "maxInputChars": 1000,
+          "reasonCode": "AI_NOT_CONFIGURED"
+        }
+      },
+      "AiConversation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "type": "string",
+            "description": "显示标题",
+            "maxLength": 120
+          },
+          "status": {
+            "type": "string",
+            "description": "会话状态",
+            "enum": [
+              "ACTIVE",
+              "CLOSED"
+            ]
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/UtcDateTime"
+          },
+          "lastActivityAt": {
+            "$ref": "#/components/schemas/UtcDateTime"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "createdAt",
+          "lastActivityAt"
+        ]
+      },
+      "AiMessage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "seq": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "业务请求标识，与发送幂等键一致",
+            "maxLength": 64
+          },
+          "role": {
+            "type": "string",
+            "description": "展示消息角色",
+            "enum": [
+              "USER",
+              "ASSISTANT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "消息生成状态",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "FAILED",
+              "REJECTED"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "description": "用户原文、导购展示文本或固定提示",
+            "maxLength": 16000
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductCard"
+            },
+            "description": "当前仍合规且可购买的商品卡片，最多6张",
+            "minItems": 0,
+            "maxItems": 6
+          },
+          "errorCode": {
+            "type": "string",
+            "description": "可展示的失败分类",
+            "maxLength": 64
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/UtcDateTime"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/UtcDateTime"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "requestId",
+          "role",
+          "status",
+          "products",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AiRequestResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "conversationId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "本次请求标识",
+            "maxLength": 64
+          },
+          "userMessage": {
+            "$ref": "#/components/schemas/AiMessage"
+          },
+          "assistantMessage": {
+            "$ref": "#/components/schemas/AiMessage"
+          },
+          "pollAfterMs": {
+            "type": "integer",
+            "format": "int32",
+            "description": "建议前端轮询等待毫秒数",
+            "minimum": 500,
+            "maximum": 10000,
+            "example": 1500
+          }
+        },
+        "required": [
+          "conversationId",
+          "requestId",
+          "userMessage",
+          "assistantMessage",
+          "pollAfterMs"
+        ]
+      },
+      "AiMessageSlice": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiMessage"
+            },
+            "description": "消息，按seq升序",
+            "minItems": 0
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "还有较早消息",
+            "example": false
+          },
+          "nextBeforeSeq": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      },
+      "UploadResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/ResourceKey"
+          },
+          "url": {
+            "type": "string",
+            "description": "可预览URL",
+            "format": "uri"
+          },
+          "contentType": {
+            "type": "string",
+            "description": "实际校验通过的媒体类型",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "文件字节数",
+            "minimum": 1,
+            "maximum": 5242880
+          }
+        },
+        "required": [
+          "key",
+          "url",
+          "contentType",
+          "sizeBytes"
+        ],
+        "example": {
+          "key": "uploads/u101/product/demo.jpg",
+          "url": "https://example.invalid/assets/demo.jpg",
+          "contentType": "image/jpeg",
+          "sizeBytes": 102400
+        }
+      }
+    }
+  }
+}

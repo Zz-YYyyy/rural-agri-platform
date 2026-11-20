@@ -10,6 +10,10 @@
 **/target/
 *.class
 
+# Python documentation tooling cache
+__pycache__/
+*.py[cod]
+
 # Local configuration and credentials
 .env
 .env.*
